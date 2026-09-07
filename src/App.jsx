@@ -8,6 +8,85 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const getMyLocation = () => {
+  if (!navigator.geolocation) {
+    setError("Geolocation is not supported by your browser");
+    return;
+  }
+
+  setLoading(true);
+  setError("");
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const { latitude, longitude } = position.coords;
+
+      try {
+        const apiKey = import.meta.env.VITE_WEATHER_API_KEY;
+
+        // Current Weather
+        const weatherResponse = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric`
+        );
+
+        const weatherData = await weatherResponse.json();
+
+        if (!weatherResponse.ok) {
+          throw new Error(weatherData.message || "Weather error");
+        }
+
+        setWeather(weatherData);
+        setCity(weatherData.name);
+
+        // Forecast
+        const forecastResponse = await fetch(
+          `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric`
+        );
+
+        const forecastData = await forecastResponse.json();
+
+        if (!forecastResponse.ok) {
+          throw new Error("Forecast could not be loaded");
+        }
+
+        const dailyForecast = [];
+
+        forecastData.list.forEach((item) => {
+          const date = item.dt_txt.split(" ")[0];
+
+          if (
+            !dailyForecast.some(
+              (forecastItem) => forecastItem.date === date
+            )
+          ) {
+            dailyForecast.push({
+              date: date,
+              temp: Math.round(item.main.temp),
+              humidity: item.main.humidity,
+              description: item.weather[0].description,
+              icon: item.weather[0].icon,
+            });
+          }
+        });
+
+        setForecast(dailyForecast.slice(0, 5));
+
+      } catch (err) {
+        setError(err.message);
+        setWeather(null);
+        setForecast([]);
+      }
+
+      setLoading(false);
+    },
+
+    () => {
+      setLoading(false);
+      setError("Location permission denied. Please allow location access.");
+    }
+  );
+};
+
   const searchWeather = async () => {
     if (!city.trim()) {
       setError("Please enter a city name");
@@ -88,12 +167,25 @@ function App() {
   };
 
   return (
-    <div className="weather-app">
+   <div
+  className={`weather-app ${
+    weather ? weather.weather[0].main.toLowerCase() : ""
+  }`}
+>
 
       {/* Galaxy Background */}
       <div className="stars"></div>
       <div className="shooting-star"></div>
       <div className="shooting-star second"></div>
+
+      
+      {weather?.weather[0].main === "Rain" && (
+  <div className="rain-container">
+    {Array.from({ length: 60 }).map((_, index) => (
+      <span key={index}></span>
+    ))}
+  </div>
+)}
 
       <div className="weather-card">
 
@@ -114,6 +206,14 @@ function App() {
           <button onClick={searchWeather}>
             🔍
           </button>
+        </div>
+          <div className="location-button-container">
+      <button
+          className="location-button"
+           onClick={getMyLocation}
+           >
+    📍 Use My Location
+            </button>
         </div>
 
         {/* Loading */}
@@ -160,6 +260,24 @@ function App() {
               </div>
 
             </div>
+                 
+                   <div className="temperature-range">
+          <span>⬇️ {Math.round(weather.main.temp_min)}°C</span>
+         <span>⬆️ {Math.round(weather.main.temp_max)}°C</span>
+      </div>
+
+      <div className="weather-time">
+      <span>📅 {new Date().toLocaleDateString("en-IN", {
+       weekday: "long",
+       day: "numeric",
+         month: "long"
+       })}</span>
+
+      <span>🕐 {new Date().toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+         minute: "2-digit"
+       })}</span>
+    </div> 
 
             {/* Weather Details */}
             <div className="details">
@@ -185,6 +303,41 @@ function App() {
               </div>
 
             </div>
+                  <div className="sun-info">
+
+  <div className="sun-card">
+    <span>🌅</span>
+    <div>
+      <p>Sunrise</p>
+      <h3>
+        {new Date(weather.sys.sunrise * 1000).toLocaleTimeString(
+          "en-IN",
+          {
+            hour: "2-digit",
+            minute: "2-digit"
+          }
+        )}
+      </h3>
+    </div>
+  </div>
+      {/* sun rise and sun set */}
+  <div className="sun-card">
+    <span>🌇</span>
+    <div>
+      <p>Sunset</p>
+      <h3>
+        {new Date(weather.sys.sunset * 1000).toLocaleTimeString(
+          "en-IN",
+          {
+            hour: "2-digit",
+            minute: "2-digit"
+          }
+        )}
+          </h3>
+       </div>
+       </div>
+
+        </div>
 
             {/* 5 Day Forecast */}
             <div className="forecast-section">
